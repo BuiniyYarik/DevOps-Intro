@@ -1,0 +1,1 @@
+LISTEN 0      4096                *:8080            *:*    users:(("quicknotes",pid=14719,fd=3))

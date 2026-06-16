@@ -1,0 +1,2 @@
+sokosla+   14719   14504  0 22:29 pts/0    00:00:00 /home/sokoslav1707/.cache/go-build/cb/cb1919c662b2ff978989d8e0230f1042861550086b08469c7493d7fe70687083-d/quicknotes
+sokosla+   15009     491  0 22:31 pts/0    00:00:00 grep --color=auto quicknotes
