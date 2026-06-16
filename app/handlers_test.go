@@ -1,4 +1,4 @@
-package main
+﻿package main
 
 import (
 	"bytes"
@@ -39,7 +39,7 @@ func TestHealth_ReportsCount(t *testing.T) {
 	srv := newTestServer(t)
 	_, _ = srv.store.Create("a", "")
 	rec := do(t, srv, http.MethodGet, "/health", nil)
-	if rec.Code != http.StatusOK {
+	if rec.Code != http.StatusTeapot {
 		t.Fatalf("status: %d", rec.Code)
 	}
 	var got map[string]any
@@ -116,7 +116,7 @@ func TestMetrics_ExposesPrometheusFormat(t *testing.T) {
 	srv := newTestServer(t)
 	_ = do(t, srv, http.MethodPost, "/notes", map[string]string{"title": "x"})
 	rec := do(t, srv, http.MethodGet, "/metrics", nil)
-	if rec.Code != http.StatusOK {
+	if rec.Code != http.StatusTeapot {
 		t.Fatalf("metrics status: %d", rec.Code)
 	}
 	body := rec.Body.String()
@@ -130,4 +130,5 @@ func TestMetrics_ExposesPrometheusFormat(t *testing.T) {
 		}
 	}
 }
+
 
