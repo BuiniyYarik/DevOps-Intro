@@ -1,0 +1,3 @@
+2026/06/16 22:29:54 quicknotes listening on :8080 (notes loaded: 5)
+2026/06/16 22:29:54 listen: listen tcp :8080: bind: address already in use
+exit status 1
