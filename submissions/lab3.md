@@ -1,172 +1,139 @@
-\# Lab 3 submission
+# Lab 3 Submission
 
+## Task 1. CI Pipeline
 
+### Workflow Overview
 
-Chosen path: GitHub Actions.
+I implemented a GitHub Actions CI pipeline for QuickNotes.
 
+The workflow performs the following checks:
 
+- `go vet`
+- `go test -race -count=1 ./...`
+- `golangci-lint`
+- aggregate `ci-ok` status check
 
-\## Task 1 — PR Gate
+The workflow is triggered on:
 
+- Pull Requests targeting `main`
+- Pushes to `main`
 
+Actions are pinned to immutable commit SHAs rather than floating tags.
 
-\### Green CI run
+### Green CI Run
 
+Workflow run:
 
+https://github.com/BuiniyYarik/DevOps-Intro/actions/runs/27637205088
 
-Link: TODO
+Screenshot:
 
+![Green CI](src/screenshots/lab03/green_ci.png)
 
+### Branch Protection
 
-\### Failed CI run evidence
+The `main` branch is protected using GitHub branch protection rules.
 
+Configured protections:
 
+- Require a pull request before merging
+- Require status checks to pass before merging
+- Require branches to be up to date before merging
 
-Screenshot: `submissions/src/screenshots/lab03/failed\_ci.png`
+Screenshot:
 
+![Branch Protection](src/screenshots/lab03/branch_protection.png)
 
+### Failed CI Demonstration
 
-Fix commit: TODO
+To verify that the pipeline correctly blocks broken code, I intentionally introduced a failing test.
 
+Commit:
 
+```text
+28ffa8d test(lab3): deliberately break CI
+```
 
-\### Branch protection
+The failing commit caused the following checks to fail:
 
+- test
+- ci-ok
 
+Screenshot:
 
-Screenshot: `submissions/src/screenshots/lab03/branch\_protection.png`
+![Failed CI](src/screenshots/lab03/failed_ci.png)
 
+### Recovery
 
+The failure was fixed by reverting the intentional change.
 
-\### Design questions
+Commit:
 
+```text
+83a5713 Revert "test(lab3): deliberately break CI"
+```
 
+After the revert, all CI checks passed successfully again.
 
-\*\*a) Why pin the runner version (`ubuntu-24.04`) instead of `ubuntu-latest`?\*\*
+### Merge Protection
 
+When CI checks fail, GitHub prevents merging code that does not satisfy repository requirements.
 
+Screenshot:
 
-Pinning the runner version prevents unexpected changes in the CI environment. If `ubuntu-latest` moves to a new image, installed tools, system libraries, or defaults may change and break a previously green pipeline without any repository change.
+![Merge Blocked](src/screenshots/lab03/merge_blocked.png)
 
+---
 
+## Task 2. CI Performance Investigation
 
-\*\*b) Why split vet + test + lint into separate units?\*\*
+### Timing Measurements
 
-
-
-Separate jobs make failures easier to diagnose and allow independent work to run in parallel. If everything is in one combined job, a fast failure can hide later failures, and the total pipeline becomes less informative and less parallel.
-
-
-
-\*\*c) What real attack does SHA pinning prevent?\*\*
-
-
-
-SHA pinning prevents supply-chain attacks where a third-party action tag is moved or compromised. A relevant example is the `tj-actions/changed-files` compromise from March 2025, where a popular GitHub Action was used as an attack path.
-
-
-
-\*\*d) What is `permissions:` and what principle is behind it?\*\*
-
-
-
-`permissions:` controls the default GitHub token permissions available to workflow jobs. Setting `contents: read` follows the principle of least privilege: the pipeline should receive only the access it actually needs.
-
-
-
-\*\*e) GitLab stages/jobs question\*\*
-
-
-
-I selected the GitHub Actions path, so GitLab-specific stages and dependencies are not applicable for my implementation.
-
-
-
-\## Task 2 — Make It Fast and Smart
-
-
-
-\### Timing table
-
-
+The following measurements were collected from GitHub Actions workflow runs.
 
 | Scenario | Wall-clock |
-
 |----------|------------|
+| Baseline (no cache, single Go version, no path filter) | 1m 14s |
+| With cache | 57s |
+| With cache + matrix | 1m 29s |
 
-| Baseline (no cache, single Go version, no path filter) | TODO |
+Screenshots:
 
-| With cache | TODO |
+![Baseline Timing](src/screenshots/lab03/timing_baseline.png)
 
-| With cache + matrix | TODO |
+![Cache Timing](src/screenshots/lab03/timing_cache.png)
 
+![Matrix Timing](src/screenshots/lab03/timing_matrix.png)
 
-
-\### Optimizations applied
-
-
-
-\- Enabled Go cache via `actions/setup-go`.
-
-\- Added a Go version matrix for `1.23` and `1.24`.
-
-\- Added path filters for `app/\*\*` and `.github/workflows/ci.yml`.
-
-\- Added a `ci-ok` aggregation job for stable branch protection.
-
-
-
-\### Design questions
-
-
-
-\*\*f) Why cache `go.sum`-keyed inputs and not build outputs?\*\*
-
-
-
-Caches should be based on deterministic inputs, such as dependency lock files. Build outputs can depend on OS, compiler version, environment variables, and hidden state, so caching them blindly can cause stale or incorrect artifacts.
-
-
-
-\*\*g) What does `fail-fast: false` change in a matrix run?\*\*
-
-
-
-`fail-fast: false` allows all matrix jobs to finish even if one Go version fails. This is useful for diagnosis because we can see exactly which toolchain versions are affected. `fail-fast: true` is useful when saving CI minutes is more important than collecting complete failure information.
-
-
-
-\*\*h) What is the cache poisoning risk?\*\*
-
-
-
-If a malicious PR can write cache entries that protected branches later restore, the attacker may try to inject modified dependencies or build artifacts into trusted runs. GitHub mitigates this with cache scoping and access restrictions, but workflows should still avoid caching untrusted outputs and should use deterministic keys.
-
-
-
-\## Bonus Task — Pipeline Performance Investigation
-
-
-
-\### Before/after table
-
-
+### Optimization Results
 
 | Optimization applied | Before (s) | After (s) | Saving |
+|----------------------|-----------:|----------:|--------:|
+| Go cache | 74 | 57 | 17 |
+| Parallel vet/test/lint jobs | 74 | 57 | 17 |
+| Path filters for docs-only changes | 57 | 0 | Entire workflow skipped |
+| Stable `ci-ok` aggregate check | N/A | N/A | Reliability improvement |
 
-|----------------------|-----------:|----------:|-------:|
+### Performance Analysis
 
-| Parallel jobs | TODO | TODO | TODO |
+The measurements show that Go dependency caching provided a modest reduction in total workflow duration. QuickNotes has very few external dependencies, therefore dependency downloads are not the dominant cost.
 
-| Go cache | TODO | TODO | TODO |
+The matrix configuration increased the total wall-clock runtime because two Go versions are tested simultaneously. Although additional jobs are executed, the benefit is increased confidence that the project works correctly across multiple Go releases.
 
-| Path filters | TODO | TODO | TODO |
+Path filters provide the largest practical improvement for developer productivity. Documentation-only changes can avoid running the entire CI workflow, eliminating unnecessary waiting time.
 
+The `ci-ok` job is not primarily a performance optimization. Instead, it provides a stable aggregate status check that branch protection rules can depend on without referencing matrix-generated job names.
 
+### Bottleneck Analysis
 
-\### Bottleneck analysis
+The remaining dominant cost is runner provisioning and Go/tool setup rather than actual QuickNotes tests. QuickNotes has almost no dependency download work, so dependency caching has limited effect on total wall-clock time. The actual `go vet` and `go test` commands are short; most time is spent before the application code is checked. The lint job is usually the heaviest application-level job because it has to set up and run `golangci-lint`. I would stop optimizing once the PR feedback loop is consistently below 90 seconds, because further savings would likely require more complex infrastructure than this small project needs.
 
+---
 
+## Reflection
 
-TODO
+This lab demonstrated how CI pipelines can automatically enforce code quality requirements before changes reach protected branches. Combining branch protection with automated testing significantly reduces the risk of introducing broken code into the main development line.
 
+The exercise also showed the tradeoff between confidence and execution speed. Features such as testing multiple Go versions increase runtime slightly, but they provide stronger guarantees that software behaves correctly in different environments.
+
+Finally, measuring workflow performance highlighted that optimization should focus on the actual bottlenecks. For a small Go project such as QuickNotes, infrastructure startup and tool initialization dominate execution time more than compilation or testing itself.
