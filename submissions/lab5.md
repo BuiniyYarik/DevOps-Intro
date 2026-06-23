@@ -147,12 +147,6 @@ Output:
 
 ### Break the VM
 
-Source file:
-
-```text
-submissions/src/lab05/break_remove_go.txt
-```
-
 Command:
 
 ```bash
